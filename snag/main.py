@@ -54,36 +54,38 @@ def get_logo() -> str:
 """
 
 
+def ensure_config_exists() -> Path:
+    """Ensure config directory and .env file exist with placeholder."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    env_file = CONFIG_DIR / ".env"
+    if not env_file.exists():
+        env_file.write_text('# Get your API key at: https://aistudio.google.com/apikey\nGEMINI_API_KEY=""\n')
+    return env_file
+
+
 def run_setup() -> int:
     """Run interactive setup for API key configuration."""
+    env_file = ensure_config_exists()
+
     print(get_logo())
     print("=" * 50)
     print("  Configure your Gemini API Key")
     print("=" * 50)
     print("\nGet your API key at: https://aistudio.google.com/apikey\n")
     print("How would you like to configure your API key?\n")
-    print("  1. Use exported shell API key (export GEMINI_API_KEY=\"YOUR-API-KEY\")")
-    print("  2. Enter GEMINI API key now (saves to .env file)")
-    print("  3. Manually create .env file later (See README)")
+    print("  1. Enter API key now")
+    print(f"  2. Manually edit config file")
+    print(f"\nConfig location: {env_file}")
     print()
 
     while True:
         try:
-            choice = input("Select option [1-3]: ").strip()
+            choice = input("Select option [1-2]: ").strip()
         except (KeyboardInterrupt, EOFError):
             print("\n\nSetup cancelled.")
             return 1
 
         if choice == "1":
-            print("\n" + "-" * 50)
-            print("Add this to your ~/.bashrc or ~/.zshrc:\n")
-            print('  export GEMINI_API_KEY="YOUR-API-KEY"')
-            print("\nThen restart your terminal or run: source ~/.bashrc")
-            print("-" * 50)
-            print("\nSetup complete! Run 'snag' to capture a screenshot.")
-            return 0
-
-        elif choice == "2":
             print()
             try:
                 api_key = input("Enter your GEMINI API key: ").strip()
@@ -95,37 +97,25 @@ def run_setup() -> int:
                 print("Error: API key cannot be empty.")
                 continue
 
-            # Save to ~/.config/snag/.env (works from any directory)
-            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            env_file = CONFIG_DIR / ".env"
-
-            # Read existing content if file exists
-            existing_lines = []
-            if env_file.exists():
-                existing_lines = [
-                    line for line in env_file.read_text().splitlines()
-                    if not line.strip().startswith("GEMINI_API_KEY=")
-                ]
-
-            # Add the new key
-            existing_lines.append(f'GEMINI_API_KEY="{api_key}"')
-            env_file.write_text("\n".join(existing_lines) + "\n")
+            # Save to config file
+            env_file.write_text(f'# Get your API key at: https://aistudio.google.com/apikey\nGEMINI_API_KEY="{api_key}"\n')
 
             print(f"\nAPI key saved to: {env_file}")
             print("\nSetup complete! Run 'snag' to capture a screenshot.")
             return 0
 
-        elif choice == "3":
+        elif choice == "2":
             print("\n" + "-" * 50)
-            print("Create ~/.config/snag/.env with:\n")
-            print('  GEMINI_API_KEY="YOUR-API-KEY"')
-            print("\nOr ~/.snag.env or ./.env in working directory")
+            print(f"Edit this file and add your API key:\n")
+            print(f"  {env_file}")
+            print("\nReplace the empty quotes with your key:")
+            print('  GEMINI_API_KEY="your-key-here"')
             print("-" * 50)
-            print("\nSetup complete! Run 'snag' after creating the file.")
+            print("\nRun 'snag' after adding your key.")
             return 0
 
         else:
-            print("Invalid option. Please enter 1, 2, or 3.")
+            print("Invalid option. Please enter 1 or 2.")
 
 
 def main() -> int:
@@ -170,6 +160,9 @@ Environment:
     )
 
     args = parser.parse_args()
+
+    # Ensure config file exists (creates placeholder on first run)
+    ensure_config_exists()
 
     # Run setup if requested
     if args.setup:

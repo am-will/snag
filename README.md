@@ -62,9 +62,10 @@ Get your API key at: https://aistudio.google.com/apikey
 
 How would you like to configure your API key?
 
-  1. Use exported shell API key (export GEMINI_API_KEY="YOUR-API-KEY")
-  2. Enter GEMINI API key now (saves to .env file)
-  3. Manually create .env file later (See README)
+  1. Enter API key now
+  2. Manually edit config file
+
+Config location: ~/.config/snag/.env
 ```
 
 Get your free API key at: https://aistudio.google.com/apikey
@@ -104,14 +105,15 @@ Settings → Keyboard → Custom Shortcuts → Add:
 **KDE:**
 System Settings → Shortcuts → Custom Shortcuts → Add
 
-## API Key Priority
+## Config File
 
-If both are set, `.env` file takes priority over shell environment:
+Your API key is stored in `~/.config/snag/.env`:
 
-1. `.env` file in current directory (highest priority)
-2. Exported `GEMINI_API_KEY` environment variable
+```bash
+GEMINI_API_KEY="your-key-here"
+```
 
-This lets you use a specific key for snag without affecting other tools.
+This location works with keyboard shortcuts (which don't have access to shell environment variables).
 
 ## Example Output
 
