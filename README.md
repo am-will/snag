@@ -1,5 +1,7 @@
 # Snag
 
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/9d2c88ab-b139-430b-9518-43203c265a3e" />
+
 Screenshot-to-text CLI tool powered by Google Gemini vision.
 
 Capture any region of your screen and instantly get a markdown description in your clipboard - ready to paste into an LLM, document, or anywhere else.
