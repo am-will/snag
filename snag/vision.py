@@ -4,14 +4,26 @@ import base64
 import os
 import time
 from io import BytesIO
+from pathlib import Path
 from typing import Optional
 
 import requests
 from dotenv import load_dotenv
 from PIL import Image
 
-# Load .env file (overrides exported env vars, so .env takes priority)
-load_dotenv(override=True)
+# Load .env from multiple locations (first found wins, overrides shell env)
+# Priority: ~/.config/snag/.env > ~/.snag.env > ./.env
+_config_dir = Path.home() / ".config" / "snag"
+_env_locations = [
+    _config_dir / ".env",
+    Path.home() / ".snag.env",
+    Path.cwd() / ".env",
+]
+
+for _env_path in _env_locations:
+    if _env_path.exists():
+        load_dotenv(_env_path, override=True)
+        break
 
 
 class VisionError(Exception):

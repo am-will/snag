@@ -6,20 +6,29 @@ import sys
 from pathlib import Path
 
 
+# Standard config locations for .env file
+CONFIG_DIR = Path.home() / ".config" / "snag"
+ENV_LOCATIONS = [
+    CONFIG_DIR / ".env",
+    Path.home() / ".snag.env",
+    Path.cwd() / ".env",
+]
+
+
 def has_api_key() -> bool:
     """Check if GEMINI_API_KEY is available (env or .env)."""
     # Check env var first
     if os.environ.get("GEMINI_API_KEY"):
         return True
-    # Check .env file
-    env_file = Path.cwd() / ".env"
-    if env_file.exists():
-        content = env_file.read_text()
-        for line in content.splitlines():
-            if line.strip().startswith("GEMINI_API_KEY="):
-                value = line.split("=", 1)[1].strip().strip('"').strip("'")
-                if value:
-                    return True
+    # Check .env files in standard locations
+    for env_file in ENV_LOCATIONS:
+        if env_file.exists():
+            content = env_file.read_text()
+            for line in content.splitlines():
+                if line.strip().startswith("GEMINI_API_KEY="):
+                    value = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    if value:
+                        return True
     return False
 
 
@@ -86,8 +95,9 @@ def run_setup() -> int:
                 print("Error: API key cannot be empty.")
                 continue
 
-            # Save to .env file
-            env_file = Path.cwd() / ".env"
+            # Save to ~/.config/snag/.env (works from any directory)
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            env_file = CONFIG_DIR / ".env"
 
             # Read existing content if file exists
             existing_lines = []
@@ -107,8 +117,9 @@ def run_setup() -> int:
 
         elif choice == "3":
             print("\n" + "-" * 50)
-            print("Create a .env file in your working directory with:\n")
+            print("Create ~/.config/snag/.env with:\n")
             print('  GEMINI_API_KEY="YOUR-API-KEY"')
+            print("\nOr ~/.snag.env or ./.env in working directory")
             print("-" * 50)
             print("\nSetup complete! Run 'snag' after creating the file.")
             return 0
