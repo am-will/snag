@@ -2,6 +2,8 @@
 
 # Snag
 
+> **Beta** - This tool is in active development. If you encounter any issues, please [report them](https://github.com/am-will/snag/issues).
+
 Screenshot-to-text CLI tool powered by Google Gemini vision.
 
 Capture any region of your screen and instantly get a markdown description in your clipboard - ready to paste into an LLM, document, or anywhere else.
@@ -37,6 +39,16 @@ sudo apt install xclip  # or xsel
 ```bash
 sudo apt install slurp grim wl-clipboard
 ```
+
+### macOS Permissions
+
+On first run, macOS will prompt for Screen Recording permissions:
+
+1. Grant permission when prompted
+2. **Restart the app** (required for permissions to take effect)
+3. On second run, grant "bypass screen capture restrictions" if prompted
+
+You can manage these in: System Settings → Privacy & Security → Screen Recording
 
 ## Setup
 
