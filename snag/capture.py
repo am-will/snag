@@ -82,8 +82,11 @@ def _capture_wayland() -> Image.Image:
 
 def _capture_with_overlay() -> Image.Image:
     """Capture region using mss + tkinter overlay for X11/Windows/macOS."""
+    import threading
     import tkinter as tk
+
     from PIL import ImageEnhance, ImageTk
+    from pynput import keyboard
 
     # First, take a full screenshot of ALL monitors
     with mss.mss() as sct:
@@ -132,7 +135,7 @@ def _capture_with_overlay() -> Image.Image:
         selection["cancelled"] = True
         root.quit()
 
-    def on_press(event):
+    def on_mouse_press(event):
         nonlocal rect_id
         # Store absolute screen coordinates
         selection["start"] = (event.x_root, event.y_root)
@@ -144,7 +147,7 @@ def _capture_with_overlay() -> Image.Image:
             outline="white", width=2
         )
 
-    def on_drag(event):
+    def on_mouse_drag(event):
         nonlocal rect_id
         if selection["start"] and rect_id:
             # Convert start position to canvas coordinates
@@ -152,35 +155,42 @@ def _capture_with_overlay() -> Image.Image:
             y1 = selection["start"][1] - screen_y
             canvas.coords(rect_id, x1, y1, event.x, event.y)
 
-    def on_release(event):
+    def on_mouse_release(event):
         selection["end"] = (event.x_root, event.y_root)
         root.quit()
-
-    def on_escape(event):
-        cancel()
 
     def on_right_click(event):
         cancel()
 
+    # Global keyboard listener using pynput (captures keys regardless of focus)
+    def on_key_press(key):
+        if key == keyboard.Key.esc:
+            # Schedule cancel on main thread
+            root.after(0, cancel)
+            return False  # Stop listener
+        # Also check for 'q' key
+        try:
+            if key.char == 'q':
+                root.after(0, cancel)
+                return False
+        except AttributeError:
+            pass
+        return True
+
+    # Start keyboard listener in background thread
+    kb_listener = keyboard.Listener(on_press=on_key_press)
+    kb_listener.start()
+
     # Bind mouse events to canvas
-    canvas.bind("<ButtonPress-1>", on_press)
-    canvas.bind("<B1-Motion>", on_drag)
-    canvas.bind("<ButtonRelease-1>", on_release)
+    canvas.bind("<ButtonPress-1>", on_mouse_press)
+    canvas.bind("<B1-Motion>", on_mouse_drag)
+    canvas.bind("<ButtonRelease-1>", on_mouse_release)
     canvas.bind("<ButtonPress-3>", on_right_click)  # Right-click to cancel
 
-    # Bind keyboard events to root
-    root.bind("<Escape>", on_escape)
-    root.bind("<q>", on_escape)
-
-    # Enable canvas to receive keyboard focus
-    canvas.configure(takefocus=True)
-    canvas.bind("<Escape>", on_escape)
-    canvas.bind("<q>", on_escape)
-
-    # Focus the canvas so it receives keyboard events
-    root.after(1000, lambda: canvas.focus_set())
-
     root.mainloop()
+
+    # Cleanup
+    kb_listener.stop()
     root.destroy()
 
     if selection["cancelled"] or not selection["start"] or not selection["end"]:
