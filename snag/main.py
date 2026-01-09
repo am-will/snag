@@ -88,7 +88,8 @@ def run_setup() -> int:
         if choice == "1":
             print()
             try:
-                api_key = input("Enter your GEMINI API key: ").strip()
+                import getpass
+                api_key = getpass.getpass("Enter your GEMINI API key: ").strip()
             except (KeyboardInterrupt, EOFError):
                 print("\n\nSetup cancelled.")
                 return 1
@@ -97,17 +98,10 @@ def run_setup() -> int:
                 print("Error: API key cannot be empty.")
                 continue
 
-            # Mask key for display (show first and last char)
-            if len(api_key) > 2:
-                masked = api_key[0] + "*" * (len(api_key) - 2) + api_key[-1]
-            else:
-                masked = "*" * len(api_key)
-
             # Save to config file
             env_file.write_text(f'# Get your API key at: https://aistudio.google.com/apikey\nGEMINI_API_KEY="{api_key}"\n')
 
-            print(f"\nAPI key saved: {masked}")
-            print(f"Location: {env_file}")
+            print(f"\nAPI key saved to: {env_file}")
             print("\nSetup complete! Run 'snag' to capture a screenshot.")
             return 0
 
