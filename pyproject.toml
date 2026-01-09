@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "snag"
+version = "0.1.0"
+description = "Screenshot to text CLI tool using Gemini vision"
+readme = "plan.md"
+requires-python = ">=3.9"
+dependencies = [
+    "mss>=9.0.0",
+    "Pillow>=10.0.0",
+    "pyperclip>=1.9.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "plyer>=2.1.0",
+]
+
+[project.scripts]
+snag = "snag.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["snag"]
