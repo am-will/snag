@@ -82,7 +82,6 @@ def _capture_wayland() -> Image.Image:
 
 def _capture_with_overlay() -> Image.Image:
     """Capture region using mss + tkinter overlay for X11/Windows/macOS."""
-    import threading
     import tkinter as tk
 
     from PIL import ImageEnhance, ImageTk
@@ -115,7 +114,7 @@ def _capture_with_overlay() -> Image.Image:
     # Position window to cover ALL monitors (including negative coordinates)
     root.geometry(f"{screen_width}x{screen_height}+{screen_x}+{screen_y}")
 
-    # Convert darkened image to PhotoImage for display
+    # Convert darkened screenshot to PhotoImage
     photo = ImageTk.PhotoImage(darkened)
 
     canvas = tk.Canvas(
@@ -126,7 +125,7 @@ def _capture_with_overlay() -> Image.Image:
     )
     canvas.pack()
 
-    # Display the darkened screenshot as background
+    # Display darkened screenshot as background
     canvas.create_image(0, 0, anchor=tk.NW, image=photo)
 
     rect_id = None
@@ -135,25 +134,37 @@ def _capture_with_overlay() -> Image.Image:
         selection["cancelled"] = True
         root.quit()
 
+    # For selection rectangle - use two rectangles for better visibility
+    rect_border = None
+    rect_inner = None
+
     def on_mouse_press(event):
-        nonlocal rect_id
+        nonlocal rect_border, rect_inner
         # Store absolute screen coordinates
         selection["start"] = (event.x_root, event.y_root)
         selection["cancelled"] = False
-        if rect_id:
-            canvas.delete(rect_id)
-        rect_id = canvas.create_rectangle(
+        if rect_border:
+            canvas.delete(rect_border)
+            canvas.delete(rect_inner)
+        # Black outer border for contrast
+        rect_border = canvas.create_rectangle(
             event.x, event.y, event.x, event.y,
-            outline="white", width=2
+            outline="black", width=3
+        )
+        # White inner border
+        rect_inner = canvas.create_rectangle(
+            event.x, event.y, event.x, event.y,
+            outline="white", width=1
         )
 
     def on_mouse_drag(event):
-        nonlocal rect_id
-        if selection["start"] and rect_id:
+        nonlocal rect_border, rect_inner
+        if selection["start"] and rect_border:
             # Convert start position to canvas coordinates
             x1 = selection["start"][0] - screen_x
             y1 = selection["start"][1] - screen_y
-            canvas.coords(rect_id, x1, y1, event.x, event.y)
+            canvas.coords(rect_border, x1, y1, event.x, event.y)
+            canvas.coords(rect_inner, x1, y1, event.x, event.y)
 
     def on_mouse_release(event):
         selection["end"] = (event.x_root, event.y_root)
