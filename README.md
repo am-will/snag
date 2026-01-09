@@ -17,10 +17,10 @@ Capture any region of your screen and instantly get a markdown description in yo
 
 ```bash
 # Install with pip
-pip install git+https://github.com/WillReynolds5/snag.git
+pip install git+https://github.com/am-will/snag.git
 
 # Or with uv (recommended)
-uv pip install git+https://github.com/WillReynolds5/snag.git
+uv pip install git+https://github.com/am-will/snag.git
 ```
 
 ### Linux Dependencies
