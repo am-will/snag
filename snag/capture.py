@@ -37,7 +37,9 @@ def capture_region() -> Image.Image:
 
     if platform == Platform.LINUX_WAYLAND:
         return _capture_wayland()
-    elif platform in (Platform.LINUX_X11, Platform.WINDOWS, Platform.MACOS):
+    elif platform == Platform.MACOS:
+        return _capture_macos()
+    elif platform in (Platform.LINUX_X11, Platform.WINDOWS):
         return _capture_with_overlay()
     else:
         raise CaptureError(f"Unsupported platform: {platform}")
@@ -78,6 +80,39 @@ def _capture_wayland() -> Image.Image:
         return Image.open(BytesIO(result.stdout))
     except subprocess.CalledProcessError as e:
         raise CaptureError(f"grim capture failed: {e}")
+
+
+def _capture_macos() -> Image.Image:
+    """Capture region on macOS using native screencapture with interactive selection."""
+    import tempfile
+
+    # Create temp file for screenshot
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        temp_path = f.name
+
+    try:
+        # -i = interactive mode (region selection)
+        # -s = selection mode (not full screen)
+        # User presses Escape to cancel, or drags to select region
+        result = subprocess.run(
+            ["screencapture", "-i", "-s", temp_path],
+            capture_output=True,
+        )
+
+        # screencapture returns 0 even if cancelled, but file won't exist or will be empty
+        import os
+        if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
+            raise SelectionCancelled()
+
+        return Image.open(temp_path)
+
+    finally:
+        # Clean up temp file
+        import os
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
 
 
 def _capture_with_overlay() -> Image.Image:
