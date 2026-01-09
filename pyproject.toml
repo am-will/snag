@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "snag"
 version = "0.1.0"
 description = "Screenshot to text CLI tool using Gemini vision"
-readme = "plan.md"
+readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "mss>=9.0.0",
