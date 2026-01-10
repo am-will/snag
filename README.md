@@ -4,7 +4,7 @@
 
 > **Beta** - This tool is in active development. If you encounter any issues, please [report them](https://github.com/am-will/snag/issues).
 
-Screenshot-to-text CLI tool powered by Google Gemini vision.
+Screenshot-to-text CLI tool powered by vision AI (Google Gemini or OpenRouter).
 
 Capture any region of your screen and instantly get a markdown description in your clipboard - ready to paste into an LLM, document, or anywhere else.
 
@@ -14,17 +14,17 @@ Capture any region of your screen and instantly get a markdown description in yo
 - **Multi-monitor support** - Works across all your displays
 - **Smart transcription** - Handles text, code, diagrams, charts, UI elements, and images
 - **Instant clipboard** - Results copied automatically, ready to paste
-- **Multiple models** - Choose between Gemini 2.5 Flash (default) or Gemini 3 Flash Preview
+- **Multiple providers** - Google Gemini (direct) or OpenRouter (access to many models)
 - **Cross-platform** - Linux (X11/Wayland), Windows, macOS
 
 ## Installation
 
 ```bash
-# Install with pip
-pip install git+https://github.com/am-will/snag.git
+# Install with uv (recommended)
+uv tool install git+https://github.com/am-will/snag.git
 
-# Or with uv (recommended)
-uv pip install git+https://github.com/am-will/snag.git
+# Update to latest version
+snag --update
 ```
 
 ### Linux Dependencies
@@ -52,47 +52,56 @@ You can manage these in: System Settings → Privacy & Security → Screen Recor
 
 ## Setup
 
-Run `snag` for the first time to configure your API key:
+Run `snag --setup` to configure your API keys and defaults:
 
 ```
-$ snag
-
-  ███████╗███╗   ██╗ █████╗  ██████╗
-  ██╔════╝████╗  ██║██╔══██╗██╔════╝
-  ███████╗██╔██╗ ██║███████║██║  ███╗
-  ╚════██║██║╚██╗██║██╔══██║██║   ██║
-  ███████║██║ ╚████║██║  ██║╚██████╔╝
-  ╚══════╝╚═╝  ╚═══╝╚═╝  ╚═╝ ╚═════╝
-
-  Screenshot → Text → Clipboard
+$ snag --setup
 
 ==================================================
-  Configure your Gemini API Key
+  Current Settings
 ==================================================
 
-Get your API key at: https://aistudio.google.com/apikey
+  API Keys:
+    Google Gemini:  not configured
+    OpenRouter:     not configured
 
-How would you like to configure your API key?
+  Defaults:
+    Provider: google
+    Model:    gemini-2.5-flash
 
-  1. Enter API key now
-  2. Manually edit config file
+==================================================
+  Setup Menu
+==================================================
 
-Config location: ~/.config/snag/.env
+  1. Configure Google Gemini API key
+  2. Configure OpenRouter API key
+  3. Set default provider
+  4. Set default model
+  5. Exit setup
 ```
 
-Get your free API key at: https://aistudio.google.com/apikey
+Get your API keys:
+- **Google Gemini**: https://aistudio.google.com/apikey (free)
+- **OpenRouter**: https://openrouter.ai/keys
 
 ## Usage
 
 ```bash
-# Capture a region (default model: gemini-2.5-flash)
+# Capture a region (uses defaults from config)
 snag
 
-# Use Gemini 3 Flash Preview
-snag --model gemini-3-flash-preview
+# Use Google Gemini directly
+snag --provider google --model gemini-2.5-flash
 
-# Re-run setup
+# Use OpenRouter with any supported model
+snag --provider openrouter --model google/gemini-2.5-flash-lite
+snag --provider openrouter --model anthropic/claude-3.5-sonnet
+
+# Configure API keys and defaults
 snag --setup
+
+# Update to latest version
+snag --update
 ```
 
 ### Controls
@@ -117,12 +126,21 @@ Settings → Keyboard → Custom Shortcuts → Add:
 **KDE:**
 System Settings → Shortcuts → Custom Shortcuts → Add
 
-## Config File
+## Config Files
 
-Your API key is stored in `~/.config/snag/.env`:
+Configuration is stored in `~/.config/snag/`:
 
+**API Keys** (`.env`):
 ```bash
-GEMINI_API_KEY="your-key-here"
+GEMINI_API_KEY="your-gemini-key"
+OPENROUTER_API_KEY="your-openrouter-key"
+```
+
+**Settings** (`config.toml`):
+```toml
+[defaults]
+provider = "google"
+model = "gemini-2.5-flash"
 ```
 
 This location works with keyboard shortcuts (which don't have access to shell environment variables).

@@ -2,12 +2,28 @@
 
 import argparse
 import os
+import subprocess
 import sys
 from pathlib import Path
 
+from .config import (
+    CONFIG_DIR,
+    DEFAULT_MODEL,
+    DEFAULT_PROVIDER,
+    ENV_FILE,
+    GOOGLE_MODELS,
+    get_config,
+    get_default_model,
+    get_default_provider,
+    save_config,
+    set_default_model,
+    set_default_provider,
+)
+
+# Git repository for updates
+GIT_REPO = "git+https://github.com/am-will/snag.git"
 
 # Standard config locations for .env file
-CONFIG_DIR = Path.home() / ".config" / "snag"
 ENV_LOCATIONS = [
     CONFIG_DIR / ".env",
     Path.home() / ".snag.env",
@@ -15,21 +31,41 @@ ENV_LOCATIONS = [
 ]
 
 
-def has_api_key() -> bool:
-    """Check if GEMINI_API_KEY is available (env or .env)."""
+def has_api_key(provider: str = "google") -> bool:
+    """Check if API key for provider is available (env or .env)."""
+    key_name = "GEMINI_API_KEY" if provider == "google" else "OPENROUTER_API_KEY"
+
     # Check env var first
-    if os.environ.get("GEMINI_API_KEY"):
+    if os.environ.get(key_name):
         return True
     # Check .env files in standard locations
     for env_file in ENV_LOCATIONS:
         if env_file.exists():
             content = env_file.read_text()
             for line in content.splitlines():
-                if line.strip().startswith("GEMINI_API_KEY="):
+                if line.strip().startswith(f"{key_name}="):
                     value = line.split("=", 1)[1].strip().strip('"').strip("'")
                     if value:
                         return True
     return False
+
+
+def run_update() -> int:
+    """Update snag to the latest version using uv."""
+    print("Updating snag...")
+    try:
+        result = subprocess.run(
+            ["uv", "tool", "install", "--force", GIT_REPO],
+            check=False,
+        )
+        if result.returncode == 0:
+            print("\nSnag updated successfully!")
+        else:
+            print("\nUpdate failed. Make sure 'uv' is installed.", file=sys.stderr)
+        return result.returncode
+    except FileNotFoundError:
+        print("Error: 'uv' not found. Install it from https://docs.astral.sh/uv/", file=sys.stderr)
+        return 1
 
 
 def get_logo() -> str:
@@ -59,64 +95,191 @@ def ensure_config_exists() -> Path:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     env_file = CONFIG_DIR / ".env"
     if not env_file.exists():
-        env_file.write_text('# Get your API key at: https://aistudio.google.com/apikey\nGEMINI_API_KEY=""\n')
+        env_file.write_text(
+            '# API Keys for Snag\n'
+            '# Google Gemini: https://aistudio.google.com/apikey\n'
+            'GEMINI_API_KEY=""\n'
+            '# OpenRouter: https://openrouter.ai/keys\n'
+            'OPENROUTER_API_KEY=""\n'
+        )
     return env_file
 
 
-def run_setup() -> int:
-    """Run interactive setup for API key configuration."""
-    env_file = ensure_config_exists()
+def _get_env_content() -> dict[str, str]:
+    """Read current .env file content as dict."""
+    env_file = CONFIG_DIR / ".env"
+    content = {}
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                content[key.strip()] = value.strip().strip('"').strip("'")
+    return content
 
-    print(get_logo())
+
+def _save_env_content(content: dict[str, str]) -> None:
+    """Save dict to .env file."""
+    env_file = CONFIG_DIR / ".env"
+    lines = [
+        "# API Keys for Snag",
+        "# Google Gemini: https://aistudio.google.com/apikey",
+        f'GEMINI_API_KEY="{content.get("GEMINI_API_KEY", "")}"',
+        "# OpenRouter: https://openrouter.ai/keys",
+        f'OPENROUTER_API_KEY="{content.get("OPENROUTER_API_KEY", "")}"',
+    ]
+    env_file.write_text("\n".join(lines) + "\n")
+
+
+def _configure_api_key(provider: str) -> bool:
+    """Configure API key for a provider. Returns True if successful."""
+    import getpass
+
+    env_content = _get_env_content()
+    key_name = "GEMINI_API_KEY" if provider == "google" else "OPENROUTER_API_KEY"
+    url = "https://aistudio.google.com/apikey" if provider == "google" else "https://openrouter.ai/keys"
+
+    print(f"\nGet your API key at: {url}\n")
+
+    try:
+        api_key = getpass.getpass(f"Enter your {provider.upper()} API key: ").strip()
+    except (KeyboardInterrupt, EOFError):
+        print("\nCancelled.")
+        return False
+
+    if not api_key:
+        print("Error: API key cannot be empty.")
+        return False
+
+    env_content[key_name] = api_key
+    _save_env_content(env_content)
+    print(f"\n{provider.capitalize()} API key saved!")
+    return True
+
+
+def _show_current_settings() -> None:
+    """Display current configuration."""
+    config = get_config()
+    defaults = config.get("defaults", {})
+
+    print("\n" + "=" * 50)
+    print("  Current Settings")
     print("=" * 50)
-    print("  Configure your Gemini API Key")
-    print("=" * 50)
-    print("\nGet your API key at: https://aistudio.google.com/apikey\n")
-    print("How would you like to configure your API key?\n")
-    print("  1. Enter API key now")
-    print(f"  2. Manually edit config file")
-    print(f"\nConfig location: {env_file}")
+
+    # API Keys status
+    gemini_ok = has_api_key("google")
+    openrouter_ok = has_api_key("openrouter")
+    print(f"\n  API Keys:")
+    print(f"    Google Gemini:  {'configured' if gemini_ok else 'not configured'}")
+    print(f"    OpenRouter:     {'configured' if openrouter_ok else 'not configured'}")
+
+    # Defaults
+    print(f"\n  Defaults:")
+    print(f"    Provider: {defaults.get('provider', DEFAULT_PROVIDER)}")
+    print(f"    Model:    {defaults.get('model', DEFAULT_MODEL)}")
+
+    print(f"\n  Config files:")
+    print(f"    {CONFIG_DIR / '.env'}")
+    print(f"    {CONFIG_DIR / 'config.toml'}")
     print()
 
+
+def run_setup() -> int:
+    """Run interactive setup for configuration."""
+    ensure_config_exists()
+
+    print(get_logo())
+
     while True:
+        _show_current_settings()
+
+        print("=" * 50)
+        print("  Setup Menu")
+        print("=" * 50)
+        print("\n  1. Configure Google Gemini API key")
+        print("  2. Configure OpenRouter API key")
+        print("  3. Set default provider")
+        print("  4. Set default model")
+        print("  5. Exit setup")
+        print()
+
         try:
-            choice = input("Select option [1-2]: ").strip()
+            choice = input("Select option [1-5]: ").strip()
         except (KeyboardInterrupt, EOFError):
             print("\n\nSetup cancelled.")
-            return 1
+            return 0
 
         if choice == "1":
-            print()
-            try:
-                import getpass
-                api_key = getpass.getpass("Enter your GEMINI API key: ").strip()
-            except (KeyboardInterrupt, EOFError):
-                print("\n\nSetup cancelled.")
-                return 1
+            _configure_api_key("google")
 
-            if not api_key:
-                print("Error: API key cannot be empty.")
+        elif choice == "2":
+            _configure_api_key("openrouter")
+
+        elif choice == "3":
+            print("\n  Available providers:")
+            print("    1. google (Google Gemini)")
+            print("    2. openrouter (OpenRouter)")
+            try:
+                p_choice = input("\n  Select provider [1-2]: ").strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\nCancelled.")
                 continue
 
-            # Save to config file
-            env_file.write_text(f'# Get your API key at: https://aistudio.google.com/apikey\nGEMINI_API_KEY="{api_key}"\n')
+            if p_choice == "1":
+                set_default_provider("google")
+                print("\n  Default provider set to: google")
+            elif p_choice == "2":
+                set_default_provider("openrouter")
+                print("\n  Default provider set to: openrouter")
+            else:
+                print("\n  Invalid option.")
 
-            print(f"\nAPI key saved to: {env_file}")
+        elif choice == "4":
+            current_provider = get_default_provider()
+            print(f"\n  Current provider: {current_provider}")
+
+            if current_provider == "google":
+                print("  Available Google models:")
+                for i, model in enumerate(GOOGLE_MODELS.keys(), 1):
+                    print(f"    {i}. {model}")
+                print(f"    {len(GOOGLE_MODELS) + 1}. Enter custom model name")
+            else:
+                print("  OpenRouter supports many models. Enter the full model name.")
+                print("  Examples: google/gemini-2.5-flash-lite, anthropic/claude-3.5-sonnet")
+
+            try:
+                if current_provider == "google":
+                    m_choice = input("\n  Select model or enter number: ").strip()
+                    model_list = list(GOOGLE_MODELS.keys())
+                    try:
+                        idx = int(m_choice) - 1
+                        if 0 <= idx < len(model_list):
+                            model = model_list[idx]
+                        elif idx == len(model_list):
+                            model = input("  Enter custom model name: ").strip()
+                        else:
+                            print("\n  Invalid option.")
+                            continue
+                    except ValueError:
+                        model = m_choice  # Treat as custom model name
+                else:
+                    model = input("\n  Enter model name: ").strip()
+
+                if model:
+                    set_default_model(model)
+                    print(f"\n  Default model set to: {model}")
+                else:
+                    print("\n  Model name cannot be empty.")
+            except (KeyboardInterrupt, EOFError):
+                print("\nCancelled.")
+                continue
+
+        elif choice == "5":
             print("\nSetup complete! Run 'snag' to capture a screenshot.")
             return 0
 
-        elif choice == "2":
-            print("\n" + "-" * 50)
-            print(f"Edit this file and add your API key:\n")
-            print(f"  {env_file}")
-            print("\nReplace the empty quotes with your key:")
-            print('  GEMINI_API_KEY="your-key-here"')
-            print("-" * 50)
-            print("\nRun 'snag' after adding your key.")
-            return 0
-
         else:
-            print("Invalid option. Please enter 1 or 2.")
+            print("\nInvalid option. Please enter 1-5.")
 
 
 def main() -> int:
@@ -124,34 +287,51 @@ def main() -> int:
     from .capture import CaptureError, SelectionCancelled, capture_region
     from .clipboard import copy_to_clipboard
     from .notify import notify_error, notify_processing, notify_success
-    from .vision import DEFAULT_MODEL, MODELS, VisionError, describe_image
+    from .vision import VisionError, describe_image
+
+    # Get defaults from config
+    config_provider = get_default_provider()
+    config_model = get_default_model()
 
     parser = argparse.ArgumentParser(
-        description="Screenshot to text using Gemini vision",
+        description="Screenshot to text using vision AI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
 Examples:
-  snag                              # Use default model (gemini-2.5-flash)
-  snag --model gemini-3-flash-preview   # Use Gemini 3 Flash
-  snag --setup                      # Configure API key
+  snag                                          # Use defaults from config
+  snag --provider google --model gemini-2.5-flash
+  snag --provider openrouter --model google/gemini-2.5-flash-lite
+  snag --provider openrouter --model anthropic/claude-3.5-sonnet
+  snag --setup                                  # Configure API keys and defaults
+
+Current defaults (from config):
+  Provider: {config_provider}
+  Model:    {config_model}
 
 Environment:
-  GEMINI_API_KEY    Your Gemini API key (required)
-                    Get one at: https://aistudio.google.com/apikey
+  GEMINI_API_KEY       Google Gemini API key (https://aistudio.google.com/apikey)
+  OPENROUTER_API_KEY   OpenRouter API key (https://openrouter.ai/keys)
 """,
     )
 
     parser.add_argument(
+        "--provider",
+        choices=["google", "openrouter"],
+        default=None,
+        help=f"Vision provider to use (default: {config_provider})",
+    )
+
+    parser.add_argument(
         "--model",
-        choices=list(MODELS.keys()),
-        default=DEFAULT_MODEL,
-        help=f"Gemini model to use (default: {DEFAULT_MODEL})",
+        type=str,
+        default=None,
+        help=f"Model to use (default: {config_model})",
     )
 
     parser.add_argument(
         "--setup",
         action="store_true",
-        help="Run interactive setup to configure API key",
+        help="Run interactive setup to configure API keys and defaults",
     )
 
     parser.add_argument(
@@ -160,7 +340,17 @@ Environment:
         version="snag 0.1.0",
     )
 
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Update snag to the latest version",
+    )
+
     args = parser.parse_args()
+
+    # Run update if requested (do this first, before config)
+    if args.update:
+        return run_update()
 
     # Ensure config file exists (creates placeholder on first run)
     ensure_config_exists()
@@ -169,18 +359,24 @@ Environment:
     if args.setup:
         return run_setup()
 
-    # Auto-trigger setup if no API key configured
-    if not has_api_key():
-        print("No GEMINI_API_KEY found. Running setup...\n")
-        return run_setup()
+    # Determine provider and model to use
+    provider = args.provider or config_provider
+    model = args.model or config_model
+
+    # Check if API key is configured for the chosen provider
+    if not has_api_key(provider):
+        key_name = "GEMINI_API_KEY" if provider == "google" else "OPENROUTER_API_KEY"
+        print(f"Error: {key_name} not found for provider '{provider}'.", file=sys.stderr)
+        print(f"Run 'snag --setup' to configure your API key.", file=sys.stderr)
+        return 1
 
     try:
         # 1. Capture screenshot region
         image = capture_region()
 
-        # 2. Send to Gemini for description (notify while waiting)
+        # 2. Send to vision API for description (notify while waiting)
         notify_processing()
-        result = describe_image(image, model=args.model)
+        result = describe_image(image, model=model, provider=provider)
 
         # 3. Copy to clipboard
         copy_to_clipboard(result)
