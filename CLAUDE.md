@@ -28,6 +28,18 @@ snag --provider google --model gemini-2.5-flash   # Google Gemini
 snag --provider openrouter --model google/gemini-2.5-flash-lite  # OpenRouter
 snag --setup                                      # Configure API keys and defaults
 snag --update                                     # Update to latest version
+
+# Test module imports
+python -c "from snag.main import main; print('OK')"
+
+# Test API without screen capture
+python -c "
+from PIL import Image
+from snag.vision import describe_image
+img = Image.new('RGB', (100, 100), color='red')
+result = describe_image(img, provider='google', model='gemini-2.5-flash')
+print(result)
+"
 ```
 
 ## Architecture
@@ -60,3 +72,52 @@ main.py → capture.py → vision.py → clipboard.py
 - Region selection uses absolute screen coordinates (important for multi-monitor with negative coords)
 - Vision API has exponential backoff retry for rate limits and timeouts
 - Supports two providers: `google` (direct Gemini API) and `openrouter` (OpenAI-compatible)
+
+## Provider Details
+
+### Google Gemini (provider: "google")
+- Direct REST API calls to `generativelanguage.googleapis.com`
+- Models defined in `config.py` `GOOGLE_MODELS` dict with endpoint and version
+- Gemini 2.5 uses `inline_data` format, Gemini 3.x uses `inlineData` (camelCase)
+- API key passed as query param: `?key=API_KEY`
+
+### OpenRouter (provider: "openrouter")
+- OpenAI-compatible API at `https://openrouter.ai/api/v1/chat/completions`
+- Accepts any model string (e.g., `google/gemini-2.5-flash-lite`, `anthropic/claude-3.5-sonnet`)
+- Images sent as base64 data URLs in content array
+- API key in Authorization header: `Bearer API_KEY`
+
+## Adding New Google Models
+
+Edit `GOOGLE_MODELS` in `snag/config.py`:
+
+```python
+GOOGLE_MODELS = {
+    "gemini-2.5-flash": {
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "version": "2.5",
+    },
+    # Add new model here:
+    "gemini-new-model": {
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-new-model:generateContent",
+        "version": "2.5",  # or "3.x" for different payload format
+    },
+}
+```
+
+## Dependencies
+
+Key dependencies (see `pyproject.toml`):
+- `mss` - Cross-platform screen capture
+- `Pillow` - Image processing
+- `pynput` - Keyboard/mouse events (X11/Windows)
+- `pyperclip` - Clipboard access
+- `requests` - HTTP client for API calls
+- `python-dotenv` - .env file loading
+- `plyer` - Cross-platform notifications
+- `tomli` - TOML parsing (Python < 3.11 only)
+
+## Git Repository
+
+- Remote: `git+https://github.com/am-will/snag.git`
+- Used by `snag --update` for self-updating via `uv tool install --force`
