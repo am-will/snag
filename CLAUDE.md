@@ -29,6 +29,9 @@ snag --provider openrouter --model google/gemini-2.5-flash-lite  # OpenRouter
 snag --provider zai                               # Z.AI GLM-4.6V via MCP
 snag --setup                                      # Configure API keys and defaults
 snag --update                                     # Update to latest version
+snag --version                                    # Show current version
+snag --changelog                                  # Show what's new in current version
+snag --changelog-full                             # Show full changelog history
 
 # Test module imports
 python -c "from snag.main import main; print('OK')"
@@ -134,3 +137,22 @@ Key dependencies (see `pyproject.toml`):
 
 - Remote: `git+https://github.com/am-will/snag.git`
 - Used by `snag --update` for self-updating via `uv tool install --force`
+
+## Versioning
+
+This project uses [Semantic Versioning](https://semver.org/):
+- **Major** (x.0.0): Breaking changes
+- **Minor** (1.x.0): New features (e.g., new providers)
+- **Patch** (1.2.x): Bug fixes
+
+### Version Sources
+- **Single source of truth**: `snag/__init__.py` (`__version__`)
+- **Also update**: `pyproject.toml` (required for packaging)
+
+### Releasing a New Version
+
+1. Update version in `snag/__init__.py`
+2. Update version in `pyproject.toml`
+3. Move `[Unreleased]` items to new version section in `CHANGELOG.md`
+4. Commit with message: `Release vX.Y.Z`
+5. Tag: `git tag vX.Y.Z && git push --tags`

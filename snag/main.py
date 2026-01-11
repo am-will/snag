@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from . import __version__
 from .config import (
     CONFIG_DIR,
     DEFAULT_MODEL,
@@ -22,6 +23,9 @@ from .config import (
 
 # Git repository for updates
 GIT_REPO = "git+https://github.com/am-will/snag.git"
+
+# Package root directory (for finding CHANGELOG.md)
+PACKAGE_ROOT = Path(__file__).parent.parent
 
 # Standard config locations for .env file
 ENV_LOCATIONS = [
@@ -71,6 +75,44 @@ def run_update() -> int:
     except FileNotFoundError:
         print("Error: 'uv' not found. Install it from https://docs.astral.sh/uv/", file=sys.stderr)
         return 1
+
+
+def show_changelog(latest_only: bool = True) -> int:
+    """Display changelog. If latest_only, show only the most recent version."""
+    changelog_path = PACKAGE_ROOT / "CHANGELOG.md"
+
+    if not changelog_path.exists():
+        print("Changelog not found.", file=sys.stderr)
+        return 1
+
+    content = changelog_path.read_text()
+
+    if latest_only:
+        # Extract the latest version section (between first and second ## [x.x.x])
+        lines = content.splitlines()
+        output_lines = []
+        in_version = False
+        version_count = 0
+
+        for line in lines:
+            # Check for version header (## [x.x.x] or ## [Unreleased])
+            if line.startswith("## ["):
+                version_count += 1
+                if version_count == 1 and "Unreleased" in line:
+                    continue  # Skip [Unreleased] section header
+                elif version_count == 1 or (version_count == 2 and not in_version):
+                    in_version = True
+                    output_lines.append(line)
+                else:
+                    break  # Stop at the next version
+            elif in_version:
+                output_lines.append(line)
+
+        print("\n".join(output_lines))
+    else:
+        print(content)
+
+    return 0
 
 
 def get_logo() -> str:
@@ -315,11 +357,6 @@ def run_setup() -> int:
 
 def main() -> int:
     """Main entry point for the Snag CLI."""
-    from .capture import CaptureError, SelectionCancelled, capture_region
-    from .clipboard import copy_to_clipboard
-    from .notify import notify_error, notify_processing, notify_success
-    from .vision import VisionError, describe_image
-
     # Get defaults from config
     config_provider = get_default_provider()
     config_model = get_default_model()
@@ -369,7 +406,7 @@ Environment:
     parser.add_argument(
         "--version",
         action="version",
-        version="snag 0.1.0",
+        version=f"snag {__version__}",
     )
 
     parser.add_argument(
@@ -378,11 +415,29 @@ Environment:
         help="Update snag to the latest version",
     )
 
+    parser.add_argument(
+        "--changelog",
+        action="store_true",
+        help="Show what's new in the current version",
+    )
+
+    parser.add_argument(
+        "--changelog-full",
+        action="store_true",
+        help="Show the full changelog history",
+    )
+
     args = parser.parse_args()
 
     # Run update if requested (do this first, before config)
     if args.update:
         return run_update()
+
+    # Show changelog if requested
+    if args.changelog:
+        return show_changelog(latest_only=True)
+    if args.changelog_full:
+        return show_changelog(latest_only=False)
 
     # Ensure config file exists (creates placeholder on first run)
     ensure_config_exists()
@@ -406,6 +461,12 @@ Environment:
         print(f"Error: {key_name} not found for provider '{provider}'.", file=sys.stderr)
         print(f"Run 'snag --setup' to configure your API key.", file=sys.stderr)
         return 1
+
+    # Import heavy dependencies only when needed for capture
+    from .capture import CaptureError, SelectionCancelled, capture_region
+    from .clipboard import copy_to_clipboard
+    from .notify import notify_error, notify_processing, notify_success
+    from .vision import VisionError, describe_image
 
     try:
         # 1. Capture screenshot region

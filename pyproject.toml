@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "snag"
-version = "0.1.0"
+version = "1.2.0"
 description = "Screenshot to text CLI tool using Gemini vision"
 readme = "README.md"
 license = "MIT"
