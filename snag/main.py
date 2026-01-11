@@ -33,7 +33,12 @@ ENV_LOCATIONS = [
 
 def has_api_key(provider: str = "google") -> bool:
     """Check if API key for provider is available (env or .env)."""
-    key_name = "GEMINI_API_KEY" if provider == "google" else "OPENROUTER_API_KEY"
+    key_map = {
+        "google": "GEMINI_API_KEY",
+        "openrouter": "OPENROUTER_API_KEY",
+        "zai": "Z_AI_API_KEY",
+    }
+    key_name = key_map.get(provider, f"{provider.upper()}_API_KEY")
 
     # Check env var first
     if os.environ.get(key_name):
@@ -101,6 +106,8 @@ def ensure_config_exists() -> Path:
             'GEMINI_API_KEY=""\n'
             '# OpenRouter: https://openrouter.ai/keys\n'
             'OPENROUTER_API_KEY=""\n'
+            '# Z.AI (GLM-4.6V): https://open.bigmodel.cn/\n'
+            'Z_AI_API_KEY=""\n'
         )
     return env_file
 
@@ -127,6 +134,8 @@ def _save_env_content(content: dict[str, str]) -> None:
         f'GEMINI_API_KEY="{content.get("GEMINI_API_KEY", "")}"',
         "# OpenRouter: https://openrouter.ai/keys",
         f'OPENROUTER_API_KEY="{content.get("OPENROUTER_API_KEY", "")}"',
+        "# Z.AI (GLM-4.6V): https://open.bigmodel.cn/",
+        f'Z_AI_API_KEY="{content.get("Z_AI_API_KEY", "")}"',
     ]
     env_file.write_text("\n".join(lines) + "\n")
 
@@ -136,8 +145,12 @@ def _configure_api_key(provider: str) -> bool:
     import getpass
 
     env_content = _get_env_content()
-    key_name = "GEMINI_API_KEY" if provider == "google" else "OPENROUTER_API_KEY"
-    url = "https://aistudio.google.com/apikey" if provider == "google" else "https://openrouter.ai/keys"
+    key_map = {
+        "google": ("GEMINI_API_KEY", "https://aistudio.google.com/apikey"),
+        "openrouter": ("OPENROUTER_API_KEY", "https://openrouter.ai/keys"),
+        "zai": ("Z_AI_API_KEY", "https://open.bigmodel.cn/"),
+    }
+    key_name, url = key_map.get(provider, (f"{provider.upper()}_API_KEY", ""))
 
     print(f"\nGet your API key at: {url}\n")
 
@@ -169,9 +182,11 @@ def _show_current_settings() -> None:
     # API Keys status
     gemini_ok = has_api_key("google")
     openrouter_ok = has_api_key("openrouter")
+    zai_ok = has_api_key("zai")
     print(f"\n  API Keys:")
     print(f"    Google Gemini:  {'configured' if gemini_ok else 'not configured'}")
     print(f"    OpenRouter:     {'configured' if openrouter_ok else 'not configured'}")
+    print(f"    Z.AI:           {'configured' if zai_ok else 'not configured'}")
 
     # Defaults
     print(f"\n  Defaults:")
@@ -198,13 +213,14 @@ def run_setup() -> int:
         print("=" * 50)
         print("\n  1. Configure Google Gemini API key")
         print("  2. Configure OpenRouter API key")
-        print("  3. Set default provider")
-        print("  4. Set default model")
-        print("  5. Exit setup")
+        print("  3. Configure Z.AI API key")
+        print("  4. Set default provider")
+        print("  5. Set default model")
+        print("  6. Exit setup")
         print()
 
         try:
-            choice = input("Select option [1-5]: ").strip()
+            choice = input("Select option [1-6]: ").strip()
         except (KeyboardInterrupt, EOFError):
             print("\n\nSetup cancelled.")
             return 0
@@ -216,11 +232,15 @@ def run_setup() -> int:
             _configure_api_key("openrouter")
 
         elif choice == "3":
+            _configure_api_key("zai")
+
+        elif choice == "4":
             print("\n  Available providers:")
             print("    1. google (Google Gemini)")
             print("    2. openrouter (OpenRouter)")
+            print("    3. zai (Z.AI GLM-4.6V)")
             try:
-                p_choice = input("\n  Select provider [1-2]: ").strip()
+                p_choice = input("\n  Select provider [1-3]: ").strip()
             except (KeyboardInterrupt, EOFError):
                 print("\nCancelled.")
                 continue
@@ -231,10 +251,13 @@ def run_setup() -> int:
             elif p_choice == "2":
                 set_default_provider("openrouter")
                 print("\n  Default provider set to: openrouter")
+            elif p_choice == "3":
+                set_default_provider("zai")
+                print("\n  Default provider set to: zai")
             else:
                 print("\n  Invalid option.")
 
-        elif choice == "4":
+        elif choice == "5":
             current_provider = get_default_provider()
             print(f"\n  Current provider: {current_provider}")
 
@@ -243,6 +266,14 @@ def run_setup() -> int:
                 for i, model in enumerate(GOOGLE_MODELS.keys(), 1):
                     print(f"    {i}. {model}")
                 print(f"    {len(GOOGLE_MODELS) + 1}. Enter custom model name")
+            elif current_provider == "zai":
+                print("  Z.AI uses GLM-4.6V via MCP. Model is fixed.")
+                print("  Press Enter to continue...")
+                try:
+                    input()
+                except (KeyboardInterrupt, EOFError):
+                    pass
+                continue
             else:
                 print("  OpenRouter supports many models. Enter the full model name.")
                 print("  Examples: google/gemini-2.5-flash-lite, anthropic/claude-3.5-sonnet")
@@ -274,12 +305,12 @@ def run_setup() -> int:
                 print("\nCancelled.")
                 continue
 
-        elif choice == "5":
+        elif choice == "6":
             print("\nSetup complete! Run 'snag' to capture a screenshot.")
             return 0
 
         else:
-            print("\nInvalid option. Please enter 1-5.")
+            print("\nInvalid option. Please enter 1-6.")
 
 
 def main() -> int:
@@ -301,7 +332,7 @@ Examples:
   snag                                          # Use defaults from config
   snag --provider google --model gemini-2.5-flash
   snag --provider openrouter --model google/gemini-2.5-flash-lite
-  snag --provider openrouter --model anthropic/claude-3.5-sonnet
+  snag --provider zai                           # Z.AI GLM-4.6V via MCP
   snag --setup                                  # Configure API keys and defaults
 
 Current defaults (from config):
@@ -311,12 +342,13 @@ Current defaults (from config):
 Environment:
   GEMINI_API_KEY       Google Gemini API key (https://aistudio.google.com/apikey)
   OPENROUTER_API_KEY   OpenRouter API key (https://openrouter.ai/keys)
+  Z_AI_API_KEY         Z.AI API key (https://open.bigmodel.cn/)
 """,
     )
 
     parser.add_argument(
         "--provider",
-        choices=["google", "openrouter"],
+        choices=["google", "openrouter", "zai"],
         default=None,
         help=f"Vision provider to use (default: {config_provider})",
     )
@@ -365,7 +397,12 @@ Environment:
 
     # Check if API key is configured for the chosen provider
     if not has_api_key(provider):
-        key_name = "GEMINI_API_KEY" if provider == "google" else "OPENROUTER_API_KEY"
+        key_map = {
+            "google": "GEMINI_API_KEY",
+            "openrouter": "OPENROUTER_API_KEY",
+            "zai": "Z_AI_API_KEY",
+        }
+        key_name = key_map.get(provider, f"{provider.upper()}_API_KEY")
         print(f"Error: {key_name} not found for provider '{provider}'.", file=sys.stderr)
         print(f"Run 'snag --setup' to configure your API key.", file=sys.stderr)
         return 1

@@ -17,6 +17,7 @@ ENV_FILE = CONFIG_DIR / ".env"
 # Defaults
 DEFAULT_PROVIDER = "google"
 DEFAULT_MODEL = "gemini-2.5-flash"
+ZAI_DEFAULT_MODEL = "glm-4.6v"  # Z.AI uses fixed model via MCP
 
 # Google Gemini model configurations (for validation when using google provider)
 GOOGLE_MODELS = {

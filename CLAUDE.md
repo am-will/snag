@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Snag is a screenshot-to-text CLI tool powered by vision AI (Google Gemini or OpenRouter). It captures a screen region, sends it to a vision model for analysis, and copies the markdown result to the clipboard.
+Snag is a screenshot-to-text CLI tool powered by vision AI (Google Gemini, OpenRouter, or Z.AI). It captures a screen region, sends it to a vision model for analysis, and copies the markdown result to the clipboard.
 
 ## Installation
 
@@ -26,6 +26,7 @@ uv pip install -e .
 snag                                              # Use defaults from config
 snag --provider google --model gemini-2.5-flash   # Google Gemini
 snag --provider openrouter --model google/gemini-2.5-flash-lite  # OpenRouter
+snag --provider zai                               # Z.AI GLM-4.6V via MCP
 snag --setup                                      # Configure API keys and defaults
 snag --update                                     # Update to latest version
 
@@ -50,6 +51,8 @@ The codebase is in `snag/` with a simple pipeline:
 main.py → capture.py → vision.py → clipboard.py
               ↓            ↓
          platform.py   config.py
+                           ↓
+                      mcp_client.py (for Z.AI)
 ```
 
 - **main.py**: CLI entry point, setup wizard, orchestrates the capture→vision→clipboard flow
@@ -58,7 +61,8 @@ main.py → capture.py → vision.py → clipboard.py
   - Wayland: uses `slurp` + `grim` subprocess calls
   - macOS: uses native `screencapture -i -s`
   - X11/Windows: uses `mss` + tkinter overlay with `pynput` for keyboard events
-- **vision.py**: Vision API integration (Google Gemini and OpenRouter) with retry logic
+- **vision.py**: Vision API integration (Google Gemini, OpenRouter, Z.AI) with retry logic
+- **mcp_client.py**: MCP (Model Context Protocol) client for Z.AI integration
 - **clipboard.py**: Thin wrapper around `pyperclip`
 - **notify.py**: Desktop notifications (osascript on macOS, plyer elsewhere)
 - **platform.py**: Platform/display server detection (X11, Wayland, macOS, Windows)
@@ -66,12 +70,12 @@ main.py → capture.py → vision.py → clipboard.py
 ## Key Implementation Details
 
 - Config stored at `~/.config/snag/` (works with keyboard shortcuts that lack shell env)
-  - `.env` - API keys (GEMINI_API_KEY, OPENROUTER_API_KEY)
+  - `.env` - API keys (GEMINI_API_KEY, OPENROUTER_API_KEY, Z_AI_API_KEY)
   - `config.toml` - Default provider and model settings
 - Multi-monitor support via mss's `monitors[0]` which spans all displays
 - Region selection uses absolute screen coordinates (important for multi-monitor with negative coords)
 - Vision API has exponential backoff retry for rate limits and timeouts
-- Supports two providers: `google` (direct Gemini API) and `openrouter` (OpenAI-compatible)
+- Supports three providers: `google` (direct Gemini API), `openrouter` (OpenAI-compatible), and `zai` (MCP-based)
 
 ## Provider Details
 
@@ -86,6 +90,15 @@ main.py → capture.py → vision.py → clipboard.py
 - Accepts any model string (e.g., `google/gemini-2.5-flash-lite`, `anthropic/claude-3.5-sonnet`)
 - Images sent as base64 data URLs in content array
 - API key in Authorization header: `Bearer API_KEY`
+
+### Z.AI (provider: "zai")
+- Uses Model Context Protocol (MCP) via `@z_ai/mcp-server` npm package
+- Requires Node.js >= v22.0.0
+- Communicates via JSON-RPC over stdio (subprocess)
+- Model: GLM-4.6V (fixed, not configurable)
+- Tool used: `analyze_image` for general-purpose image understanding
+- API key env var: `Z_AI_API_KEY`
+- MCP server launched via: `npx -y @z_ai/mcp-server`
 
 ## Adding New Google Models
 
